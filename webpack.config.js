@@ -4,32 +4,8 @@ var glob = require('glob');//glob，这个是一个全局的模块，动态配�
 var HtmlWebpackPlugin = require('html-webpack-plugin'); //这个是通过html模板生成html页面的插件
 var MiniCssExtractPlugin = require("mini-css-extract-plugin");//分离css，webpack4推荐的分离css的插件
 var TransferWebpackPlugin = require('transfer-webpack-plugin');//原封不动的把assets中的文件复制到dist文件夹中
-var os = require('os'); //这个nodejs模块，会帮助我们获取本机ip
-var portfinder = require('portfinder'); //这个帮助我们寻找可用的端口，如果默认端口被占用了的话
-var fs = require('fs'); //处理文件用的
-var ports = fs.readFileSync('./port.json', 'utf8');
-ports = JSON.parse(ports);
-portfinder.basePort = "8080";
-portfinder.getPort(function(err, port) {
-    ports.data.port = port;
-    ports = JSON.stringify(ports,null,4);
-    fs.writeFileSync('./port.json',ports);
-});
 
-///////////////////获取本机ip///////////////////////
-function getIPAdress(){  
-    var interfaces = os.networkInterfaces();  
-    for(var devName in interfaces){
-        var iface = interfaces[devName];  
-        for(var i=0;i<iface.length;i++){  
-            var alias = iface[i];  
-            if(alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal){  
-                return alias.address;  
-            }  
-        }  
-    }  
-} 
-var host = getIPAdress();
+
 //动态添加入口
 function getEntry(){
     var entry = {};
@@ -41,11 +17,12 @@ function getEntry(){
         var n = name.slice(start,end);
         n= n.split('/')[1];
         eArr.push(name);
-        eArr.push('babel-polyfill');
+        eArr.push('babel-polyfill'); //引入这个，是为了用async await，一些IE不支持的属性能够受支持，兼容IE浏览器用的
         entry[n] = eArr;
     })
     return entry;
 }
+
 //动态生成html
 //获取html-webpack-plugin参数的方法
 var getHtmlConfig = function(name,chunks){
@@ -57,6 +34,7 @@ var getHtmlConfig = function(name,chunks){
         chunks:[name]
     }
 }
+
 module.exports = {
     entry:getEntry(),
     output:{
@@ -105,40 +83,46 @@ module.exports = {
         ]
     },
     mode:"development",
+    // 性能相关配置
     performance:{
         hints:false
     },
     //插件
     plugins:[
+        //将css分离出去
         new MiniCssExtractPlugin({
             filename: "css/[name].css"
         }),
+        //全局引入jquery
         new webpack.ProvidePlugin({
             $: "jquery",
             jQuery: "jquery",
             jquery: "jquery",
             "window.jQuery": "jquery"
         }),
+        //作用相当于copy-webpack-plugin
         new TransferWebpackPlugin([
             {
                 from: 'assets',
                 to: 'assets'
             }
         ], path.resolve(__dirname,"src")),
+        // 热更新模块，这样js改变就不会全部重载，而是只是重载你改过的那一部分
         new webpack.HotModuleReplacementPlugin()
     ],
     devServer:{
         contentBase:path.resolve(__dirname,'dist'), //最好设置成绝对路径
-        historyApiFallback: false,
+        historyApiFallback: false, //true默认打开index.html，false会出现一个目录，一会演示
         hot: true,
         inline: true,
         stats: 'errors-only',
-        host: host,
+        host: '8080',
         port: ports.data.port,
-        overlay: true,
-        open:true
+        overlay: true, //出现错误之后会在页面中出现遮罩层提示
+        open:true//运行之后自动打开本地浏览器
     }
 }
+
 //配置页面
 var entryObj = getEntry();
 var htmlArray = [];
@@ -154,3 +138,6 @@ htmlArray.forEach(function(element){
     module.exports.plugins.push(new HtmlWebpackPlugin(getHtmlConfig(element._html,element.chunks)));
 })
 
+
+// 但是webpack-dev-server打包之后的dist文件夹我们是看不见的，是打包在内存中的（也是为了快），硬盘中是看不到的
+// 如果你有个index.html，它会自动打开index.html，我这个项目没有在根目录下设置index.html
