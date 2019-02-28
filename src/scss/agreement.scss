@@ -12,6 +12,8 @@ body,html{
   padding: 20px 45px;
   padding-bottom: 150px;
   overflow-y: auto;
+  // iphone滚动兼容
+  -webkit-overflow-scrolling: touch;
   font-size: 28px;
   line-height: 48px;
   color: #666666;
